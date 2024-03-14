@@ -1,6 +1,6 @@
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, GroupAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
@@ -26,19 +26,32 @@ def generate_launch_description():
     description='When run as simulation mode'
   )
 
-  # Run driver to control the robot
-  driver = IncludeLaunchDescription(
-    PythonLaunchDescriptionSource(os.path.join(
-      get_package_share_directory('hbot_driver_' + controller_name),
-      'launch',
-      'hbot_driver.launch.py'
-    )),
-    condition=IfCondition(PythonExpression(['not ', simulation_mode]))
+  hardware_nodes = GroupAction(
+    condition=IfCondition(PythonExpression(['not ', simulation_mode])),
+    actions = [
+      # Run driver to control the robot
+      IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(
+          get_package_share_directory('hbot_driver_' + controller_name),
+          'launch',
+          'hbot_driver.launch.py'
+        )),
+      ),
+      # Run lidar node
+      IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(
+          get_package_share_directory('lds_006_driver'),
+          'launch',
+          'lds_006_driver.launch.py'
+        )),
+      )
+    ]
   )
+
 
   ld = LaunchDescription()
 
   ld.add_action(declare_simulation_mode_cmd)
-  ld.add_action(driver)
+  ld.add_action(hardware_nodes)
 
   return ld
