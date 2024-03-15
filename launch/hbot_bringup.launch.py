@@ -16,9 +16,38 @@ if controller_name not in ['yahboom']:
 
 def generate_launch_description():
   package_name = 'hbot_bringup'
+  nav2_launch_dir = os.path.join(get_package_share_directory('nav2_bringup'), 'launch')
 
-
+  # Launch arguments
   simulation_mode = LaunchConfiguration('simulation_mode')
+  slam = LaunchConfiguration('slam')
+  map_yaml_file = LaunchConfiguration('map')
+  use_sim_time = LaunchConfiguration('use_sim_time')
+  params_file = LaunchConfiguration('params_file')
+  slam_params_file = LaunchConfiguration('slam_params_file')
+  namespace = LaunchConfiguration('namespace')
+  autostart = LaunchConfiguration('autostart')
+  use_respawn = LaunchConfiguration('use_respawn')
+  log_level = LaunchConfiguration('log_level')
+
+  remappings = [('/tf', 'tf'),
+                ('/tf_static', 'tf_static')]
+
+  lifecycle_nodes = ['map_saver']
+
+  param_substitutions = {
+    'use_sim_time': use_sim_time,
+    'yaml_filename': map_yaml_file
+  }
+
+  configured_params = ParameterFile(
+    RewrittenYaml(
+      source_file=params_file,
+      param_rewrites=param_substitutions,
+      convert_types=True),
+    allow_substs=True)
+
+  stdout_linebuf_envvar = SetEnvironmentVariable('RCUTILS_LOGGING_BUFFERED_STREAM', '1')
 
   declare_simulation_mode_cmd = DeclareLaunchArgument(
     'simulation_mode',
@@ -26,6 +55,55 @@ def generate_launch_description():
     description='When run as simulation mode'
   )
 
+  declare_slam_cmd = DeclareLaunchArgument(
+    'slam',
+    'default_value=False',
+    description='Whether run SLAM'
+  )
+
+  declare_map_yaml_cmd = DeclareLaunchArgument(
+    'map',
+    default_value=os.path.join(get_package_share_directory('hbot_bringup'), 'maps', 'map.yaml'),
+    description='Full path to yaml file with map'
+  )
+
+  declare_use_sim_time_cmd = DeclareLaunchArgument(
+    'use_sim_time',
+    default_value='False',
+    description='Use simulation (Gazebo) clock if true'
+  )
+
+  declare_params_file_cmd = DeclareLaunchArgument(
+    'params_file',
+    default_value=os.path.join(get_package_share_directory('hbot_bringup'),'config', 'nav2_params.yaml'),
+    description='Full path to the ROS2 parameters file to use for all launched nodes'
+  )
+
+  declare_slam_params_file_cmd = DeclareLaunchArgument(
+    'slam_params_file',
+    default_value=os.path.join(get_package_share_directory('hbot_bringup'),'config', 'slam_params.yaml'),
+    description='Full path to the ROS2 parameters file to use for all launched nodes'
+  )
+
+  declare_autostart_cmd = DeclareLaunchArgument(
+    'autostart',
+    default_value='True',
+    description='Automatically startup the nav2 stack'
+  )
+
+  declare_log_level_cmd = DeclareLaunchArgument(
+    'log_level',
+    default_value='info',
+    description='log_level'
+  )
+
+  declare_use_respawn_cmd = DeclareLaunchArgument(
+    'use_respawn',
+    default_value='False',
+    description='Whether to respawn if a node crashes. Applied when composition is disabled.'
+  )
+
+  # Nodes
   hardware_nodes = GroupAction(
     condition=IfCondition(PythonExpression(['not ', simulation_mode])),
     actions = [
@@ -48,10 +126,76 @@ def generate_launch_description():
     ]
   )
 
+  # Run SLAM
+  slam_cmd_group = GroupAction([
+    Node(
+      package='nav2_map_server',
+      executable='map_saver_server',
+      output='screen',
+      respawn=use_respawn,
+      respawn_delay=2.0,
+      arguments=['--ros-args', '--log-level', log_level],
+      parameters=[configured_params]
+    )
+    Node(
+      package='nav2_lifecycle_manager',
+      executable='lifecycle_manager',
+      name='lifecycle_manager_slam',
+      output='screen',
+      arguments=['--ros-args', '--log-level', log_level],
+      parameters=[{'use_sim_time': use_sim_time},
+                  {'autostart': autostart},
+                  {'node_names': lifecycle_nodes}])
+    IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(slam_launch_file),
+        launch_arguments={'use_sim_time': use_sim_time,
+                          'slam_params_file': slam_params_file}.items())
+  ])
+
+
+  # Run mapping, localization and navigation
+  bringup_cmd_group = GroupAction([
+    # IncludeLaunchDescription(
+    #   PythonLaunchDescriptionSource(os.path.join(launch_dir, 'localization_launch.py')),
+    #   condition=IfCondition(PythonExpression(['not ', slam])),
+    #   launch_arguments={'namespace': namespace,
+    #                     'map': map_yaml_file,
+    #                     'use_sim_time': use_sim_time,
+    #                     'autostart': autostart,
+    #                     'params_file': params_file,
+    #                     'use_composition': False,
+    #                     'use_respawn': use_respawn,
+    #                     'container_name': 'nav2_container'}.items()),
+
+    IncludeLaunchDescription(
+      PythonLaunchDescriptionSource(os.path.join(launch_dir, 'navigation_launch.py')),
+      launch_arguments={'namespace': namespace,
+                        'use_sim_time': use_sim_time,
+                        'autostart': autostart,
+                        'params_file': params_file,
+                        'use_composition': False,
+                        'use_respawn': use_respawn,
+                        'container_name': 'nav2_container'}.items()),
+  ])
+
 
   ld = LaunchDescription()
 
+  # Set environment variables
+  ld.add_action(stdout_linebuf_envvar)
+
+  # Declare launch options
   ld.add_action(declare_simulation_mode_cmd)
+  ld.add_action(declare_slam_cmd)
+  ld.add_action(declare_map_yaml_cmd)
+  ld.add_action(declare_use_sim_time_cmd)
+  ld.add_action(declare_params_file_cmd)
+  ld.add_action(declare_autostart_cmd)
+  ld.add_action(declare_use_respawn_cmd)
+  ld.add_action(declare_log_level_cmd)
+
+  # Add the actions to launch all nodes
   ld.add_action(hardware_nodes)
+  ld.add_action(bringup_cmd_group)
 
   return ld
