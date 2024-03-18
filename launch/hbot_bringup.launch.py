@@ -1,11 +1,14 @@
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, GroupAction
+from launch.actions import (DeclareLaunchArgument, GroupAction,
+                            IncludeLaunchDescription, SetEnvironmentVariable)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.substitutions import LaunchConfiguration, PythonExpression, Command
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 from launch.conditions import IfCondition
+from launch_ros.descriptions import ParameterFile, ParameterValue
+from nav2_common.launch import RewrittenYaml, ReplaceString
 
 # Get controller board name
 controller_name = os.environ['CONTROLLER']
@@ -17,6 +20,8 @@ if controller_name not in ['yahboom']:
 def generate_launch_description():
   package_name = 'hbot_bringup'
   nav2_launch_dir = os.path.join(get_package_share_directory('nav2_bringup'), 'launch')
+  slam_toolbox_dir = get_package_share_directory('slam_toolbox')
+  slam_launch_file = os.path.join(slam_toolbox_dir, 'launch', 'online_sync_launch.py')
 
   # Launch arguments
   simulation_mode = LaunchConfiguration('simulation_mode')
@@ -57,7 +62,7 @@ def generate_launch_description():
 
   declare_slam_cmd = DeclareLaunchArgument(
     'slam',
-    'default_value=False',
+    default_value='False',
     description='Whether run SLAM'
   )
 
@@ -103,6 +108,15 @@ def generate_launch_description():
     description='Whether to respawn if a node crashes. Applied when composition is disabled.'
   )
 
+  xacro_path = os.path.join(
+    get_package_share_directory('hbot_description'),
+    'urdf', 'hbot.urdf.xacro')
+  urdf_path = os.path.join(
+    get_package_share_directory('hbot_description'),
+    'urdf', 'hbot.urdf')
+  with open(urdf_path, 'r') as infp:
+    robot_description = infp.read()
+
   # Nodes
   hardware_nodes = GroupAction(
     condition=IfCondition(PythonExpression(['not ', simulation_mode])),
@@ -122,6 +136,22 @@ def generate_launch_description():
           'launch',
           'lds_006_driver.launch.py'
         )),
+      ),
+      # Robot description
+      # IncludeLaunchDescription(
+      #   PythonLaunchDescriptionSource(os.path.join(
+      #     get_package_share_directory('hbot_description'),
+      #     'launch', 'hbot_description.launch.py'
+      #   )),
+      #   launch_arguments={'use_sim_time': use_sim_time,
+      #                     'rviz': 'false'}.items()
+      # )
+      Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        name='robot_state_publisher',
+        parameters=[{'use_sim_time': use_sim_time,
+            'robot_description': robot_description}]
       )
     ]
   )
@@ -136,7 +166,7 @@ def generate_launch_description():
       respawn_delay=2.0,
       arguments=['--ros-args', '--log-level', log_level],
       parameters=[configured_params]
-    )
+    ),
     Node(
       package='nav2_lifecycle_manager',
       executable='lifecycle_manager',
@@ -145,7 +175,7 @@ def generate_launch_description():
       arguments=['--ros-args', '--log-level', log_level],
       parameters=[{'use_sim_time': use_sim_time},
                   {'autostart': autostart},
-                  {'node_names': lifecycle_nodes}])
+                  {'node_names': lifecycle_nodes}]),
     IncludeLaunchDescription(
         PythonLaunchDescriptionSource(slam_launch_file),
         launch_arguments={'use_sim_time': use_sim_time,
@@ -168,7 +198,9 @@ def generate_launch_description():
     #                     'container_name': 'nav2_container'}.items()),
 
     IncludeLaunchDescription(
-      PythonLaunchDescriptionSource(os.path.join(launch_dir, 'navigation_launch.py')),
+      PythonLaunchDescriptionSource(os.path.join(
+          get_package_share_directory('nav2_bringup'),
+          'launch', 'navigation_launch.py')),
       launch_arguments={'namespace': namespace,
                         'use_sim_time': use_sim_time,
                         'autostart': autostart,
@@ -190,12 +222,14 @@ def generate_launch_description():
   ld.add_action(declare_map_yaml_cmd)
   ld.add_action(declare_use_sim_time_cmd)
   ld.add_action(declare_params_file_cmd)
+  ld.add_action(declare_slam_params_file_cmd)
   ld.add_action(declare_autostart_cmd)
   ld.add_action(declare_use_respawn_cmd)
   ld.add_action(declare_log_level_cmd)
 
   # Add the actions to launch all nodes
   ld.add_action(hardware_nodes)
-  ld.add_action(bringup_cmd_group)
+  ld.add_action(slam_cmd_group)
+  # ld.add_action(bringup_cmd_group)
 
   return ld
