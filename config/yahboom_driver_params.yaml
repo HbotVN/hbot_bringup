@@ -1,0 +1,15 @@
+hbot_driver_yahboom_node:
+  ros__parameters:
+    port: /dev/myserial
+    timeout: 0.1
+    debug: True
+    wheel_diameter: 0.065
+    wheel_base: 0.15
+    encoder_resolution: 11
+    gear_ratio: 56
+    max_rpm: 205
+    odom_frequency : 20
+    publish_odom_tf: True
+    publish_imu: False
+    imu_freq: 200
+    robot_base_frame: base_footprint

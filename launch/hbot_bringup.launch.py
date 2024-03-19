@@ -128,6 +128,9 @@ def generate_launch_description():
           'launch',
           'hbot_driver.launch.py'
         )),
+        launch_arguments={
+          'params_file': os.path.join(get_package_share_directory(package_name),
+          'config', 'yahboom_driver_params.yaml')}.items(),
       ),
       # Run lidar node
       IncludeLaunchDescription(

@@ -13,6 +13,7 @@ setup(
         ('share/' + package_name + '/launch', ['launch/hbot_bringup.launch.py']),
         ('share/' + package_name + '/config', ['config/nav2_params.yaml']),
         ('share/' + package_name + '/config', ['config/slam_params.yaml']),
+        ('share/' + package_name + '/config', ['config/yahboom_driver_params.yaml']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
