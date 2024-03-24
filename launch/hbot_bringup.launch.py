@@ -6,7 +6,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression, Command
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch_ros.descriptions import ParameterFile, ParameterValue
 from nav2_common.launch import RewrittenYaml, ReplaceString
 
@@ -25,6 +25,7 @@ def generate_launch_description():
 
   # Launch arguments
   simulation_mode = LaunchConfiguration('simulation_mode')
+  run_rviz = LaunchConfiguration('run_rviz')
   slam = LaunchConfiguration('slam')
   map_yaml_file = LaunchConfiguration('map')
   use_sim_time = LaunchConfiguration('use_sim_time')
@@ -58,6 +59,12 @@ def generate_launch_description():
     'simulation_mode',
     default_value='False',
     description='When run as simulation mode'
+  )
+
+  declare_run_rviz_cmd = DeclareLaunchArgument(
+    'run_rviz',
+    default_value='False',
+    description='Run rviz'
   )
 
   declare_slam_cmd = DeclareLaunchArgument(
@@ -119,7 +126,7 @@ def generate_launch_description():
 
   # Nodes
   hardware_nodes = GroupAction(
-    condition=IfCondition(PythonExpression(['not ', simulation_mode])),
+    condition=UnlessCondition(simulation_mode),
     actions = [
       # Run driver to control the robot
       IncludeLaunchDescription(
@@ -141,14 +148,6 @@ def generate_launch_description():
         )),
       ),
       # Robot description
-      # IncludeLaunchDescription(
-      #   PythonLaunchDescriptionSource(os.path.join(
-      #     get_package_share_directory('hbot_description'),
-      #     'launch', 'hbot_description.launch.py'
-      #   )),
-      #   launch_arguments={'use_sim_time': use_sim_time,
-      #                     'rviz': 'false'}.items()
-      # )
       Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
@@ -158,6 +157,19 @@ def generate_launch_description():
       )
     ]
   )
+
+  # Simulation
+  simulation_nodes = GroupAction(
+    condition=IfCondition(simulation_mode),
+    actions = [
+      IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(
+          get_package_share_directory('turtlebot3_gazebo'),
+          'launch',
+          'turtlebot3_world.launch.py')),
+        launch_arguments={'use_sim_time': use_sim_time}.items()
+      )
+  ])
 
   # Run SLAM
   slam_cmd_group = GroupAction([
@@ -182,7 +194,7 @@ def generate_launch_description():
     IncludeLaunchDescription(
         PythonLaunchDescriptionSource(slam_launch_file),
         launch_arguments={'use_sim_time': use_sim_time,
-                          'slam_params_file': slam_params_file}.items())
+                          'slam_params_file': slam_params_file}.items()),
   ])
 
 
@@ -213,6 +225,18 @@ def generate_launch_description():
                         'container_name': 'nav2_container'}.items()),
   ])
 
+  # run rviz
+  rviz_cmd = Node(
+    condition=IfCondition(run_rviz),
+    package='rviz2',
+    executable='rviz2',
+    name='rviz2',
+    arguments=['-d', os.path.join(get_package_share_directory(package_name),
+                                  'config', 'hbot.rviz')],
+    parameters=[{'use_sim_time': use_sim_time}],
+    output='screen'
+  )
+
 
   ld = LaunchDescription()
 
@@ -232,7 +256,9 @@ def generate_launch_description():
 
   # Add the actions to launch all nodes
   ld.add_action(hardware_nodes)
+  ld.add_action(simulation_nodes)
   ld.add_action(slam_cmd_group)
   # ld.add_action(bringup_cmd_group)
+  ld.add_action(rviz_cmd)
 
   return ld
