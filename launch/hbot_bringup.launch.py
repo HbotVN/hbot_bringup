@@ -164,9 +164,9 @@ def generate_launch_description():
     actions = [
       IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(
-          get_package_share_directory('turtlebot3_gazebo'),
+          get_package_share_directory('hbot_simulation'),
           'launch',
-          'turtlebot3_world.launch.py')),
+          'hbot_house.launch.py')),
         launch_arguments={'use_sim_time': use_sim_time}.items()
       )
   ])
