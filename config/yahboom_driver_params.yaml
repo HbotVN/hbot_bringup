@@ -4,7 +4,7 @@ hbot_driver_yahboom_node:
     timeout: 0.1
     debug: True
     wheel_diameter: 0.065
-    wheel_base: 0.15
+    wheel_base: 0.2
     encoder_resolution: 11
     gear_ratio: 56
     max_rpm: 205
