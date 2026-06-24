@@ -3,30 +3,28 @@ from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, GroupAction,
                             IncludeLaunchDescription, SetEnvironmentVariable)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PythonExpression, Command
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 from launch.conditions import IfCondition, UnlessCondition
-from launch_ros.descriptions import ParameterFile, ParameterValue
-from nav2_common.launch import RewrittenYaml, ReplaceString
-
-# Get controller board name
-controller_name = os.environ['CONTROLLER']
-if controller_name not in ['yahboom']:
-  # Log error
-  print('Unknown controller: ' + controller_name)
-  exit(1)
+from launch_ros.descriptions import ParameterFile
+from nav2_common.launch import RewrittenYaml
 
 def generate_launch_description():
   package_name = 'hbot_bringup'
   nav2_launch_dir = os.path.join(get_package_share_directory('nav2_bringup'), 'launch')
   slam_toolbox_dir = get_package_share_directory('slam_toolbox')
-  slam_launch_file = os.path.join(slam_toolbox_dir, 'launch', 'online_sync_launch.py')
+  slam_launch_file = os.path.join(slam_toolbox_dir, 'launch', 'online_async_launch.py')
+  controller_name = os.environ.get('CONTROLLER', 'yahboom')
+
+  if controller_name not in ['yahboom']:
+    raise RuntimeError('Unknown controller: ' + controller_name)
 
   # Launch arguments
   simulation_mode = LaunchConfiguration('simulation_mode')
   run_rviz = LaunchConfiguration('run_rviz')
   slam = LaunchConfiguration('slam')
+  enable_navigation = LaunchConfiguration('enable_navigation')
   map_yaml_file = LaunchConfiguration('map')
   use_sim_time = LaunchConfiguration('use_sim_time')
   params_file = LaunchConfiguration('params_file')
@@ -67,10 +65,22 @@ def generate_launch_description():
     description='Run rviz'
   )
 
+  declare_namespace_cmd = DeclareLaunchArgument(
+    'namespace',
+    default_value='',
+    description='Top-level namespace'
+  )
+
   declare_slam_cmd = DeclareLaunchArgument(
     'slam',
-    default_value='False',
-    description='Whether run SLAM'
+    default_value='True',
+    description='Whether to run SLAM instead of map-based localization'
+  )
+
+  declare_enable_navigation_cmd = DeclareLaunchArgument(
+    'enable_navigation',
+    default_value='True',
+    description='Whether to launch the Nav2 navigation stack'
   )
 
   declare_map_yaml_cmd = DeclareLaunchArgument(
@@ -114,10 +124,6 @@ def generate_launch_description():
     default_value='False',
     description='Whether to respawn if a node crashes. Applied when composition is disabled.'
   )
-
-  xacro_path = os.path.join(
-    get_package_share_directory('hbot_description'),
-    'urdf', 'hbot.urdf.xacro')
   urdf_path = os.path.join(
     get_package_share_directory('hbot_description'),
     'urdf', 'hbot.urdf')
@@ -195,23 +201,24 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(slam_launch_file),
         launch_arguments={'use_sim_time': use_sim_time,
                           'slam_params_file': slam_params_file}.items()),
-  ])
+  ], condition=IfCondition(slam))
+
+  localization_cmd_group = GroupAction([
+    IncludeLaunchDescription(
+      PythonLaunchDescriptionSource(os.path.join(nav2_launch_dir, 'localization_launch.py')),
+      launch_arguments={'namespace': namespace,
+                        'map': map_yaml_file,
+                        'use_sim_time': use_sim_time,
+                        'autostart': autostart,
+                        'params_file': params_file,
+                        'use_composition': 'False',
+                        'use_respawn': use_respawn,
+                        'container_name': 'nav2_container'}.items()),
+  ], condition=UnlessCondition(slam))
 
 
   # Run mapping, localization and navigation
   bringup_cmd_group = GroupAction([
-    # IncludeLaunchDescription(
-    #   PythonLaunchDescriptionSource(os.path.join(launch_dir, 'localization_launch.py')),
-    #   condition=IfCondition(PythonExpression(['not ', slam])),
-    #   launch_arguments={'namespace': namespace,
-    #                     'map': map_yaml_file,
-    #                     'use_sim_time': use_sim_time,
-    #                     'autostart': autostart,
-    #                     'params_file': params_file,
-    #                     'use_composition': False,
-    #                     'use_respawn': use_respawn,
-    #                     'container_name': 'nav2_container'}.items()),
-
     IncludeLaunchDescription(
       PythonLaunchDescriptionSource(os.path.join(
           get_package_share_directory('nav2_bringup'),
@@ -220,10 +227,10 @@ def generate_launch_description():
                         'use_sim_time': use_sim_time,
                         'autostart': autostart,
                         'params_file': params_file,
-                        'use_composition': False,
+                        'use_composition': 'False',
                         'use_respawn': use_respawn,
                         'container_name': 'nav2_container'}.items()),
-  ])
+  ], condition=IfCondition(enable_navigation))
 
   # run rviz
   rviz_cmd = Node(
@@ -245,7 +252,10 @@ def generate_launch_description():
 
   # Declare launch options
   ld.add_action(declare_simulation_mode_cmd)
+  ld.add_action(declare_run_rviz_cmd)
+  ld.add_action(declare_namespace_cmd)
   ld.add_action(declare_slam_cmd)
+  ld.add_action(declare_enable_navigation_cmd)
   ld.add_action(declare_map_yaml_cmd)
   ld.add_action(declare_use_sim_time_cmd)
   ld.add_action(declare_params_file_cmd)
@@ -258,7 +268,8 @@ def generate_launch_description():
   ld.add_action(hardware_nodes)
   ld.add_action(simulation_nodes)
   ld.add_action(slam_cmd_group)
-  # ld.add_action(bringup_cmd_group)
+  ld.add_action(localization_cmd_group)
+  ld.add_action(bringup_cmd_group)
   ld.add_action(rviz_cmd)
 
   return ld
