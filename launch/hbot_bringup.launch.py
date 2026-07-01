@@ -5,7 +5,7 @@ from launch.actions import (DeclareLaunchArgument, GroupAction,
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import get_package_share_directory, PackageNotFoundError
 from launch.conditions import IfCondition, UnlessCondition
 from launch_ros.descriptions import ParameterFile
 from nav2_common.launch import RewrittenYaml
@@ -165,17 +165,27 @@ def generate_launch_description():
   )
 
   # Simulation
-  simulation_nodes = GroupAction(
-    condition=IfCondition(simulation_mode),
-    actions = [
-      IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(
-          get_package_share_directory('hbot_simulation'),
-          'launch',
-          'hbot_house.launch.py')),
-        launch_arguments={'use_sim_time': use_sim_time}.items()
-      )
-  ])
+  try:
+    simulation_dir = get_package_share_directory('hbot_simulation')
+    has_simulation = True
+  except PackageNotFoundError:
+    has_simulation = False
+
+  if has_simulation:
+    simulation_nodes = GroupAction(
+      condition=IfCondition(simulation_mode),
+      actions = [
+        IncludeLaunchDescription(
+          PythonLaunchDescriptionSource(os.path.join(
+            simulation_dir,
+            'launch',
+            'hbot_house.launch.py')),
+          launch_arguments={'use_sim_time': use_sim_time}.items()
+        )
+      ]
+    )
+  else:
+    simulation_nodes = None
 
   # Run SLAM
   slam_cmd_group = GroupAction([
@@ -266,7 +276,8 @@ def generate_launch_description():
 
   # Add the actions to launch all nodes
   ld.add_action(hardware_nodes)
-  ld.add_action(simulation_nodes)
+  if simulation_nodes is not None:
+    ld.add_action(simulation_nodes)
   ld.add_action(slam_cmd_group)
   ld.add_action(localization_cmd_group)
   ld.add_action(bringup_cmd_group)
