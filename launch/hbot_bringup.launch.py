@@ -125,8 +125,8 @@ def generate_launch_description():
     description='Whether to respawn if a node crashes. Applied when composition is disabled.'
   )
   urdf_path = os.path.join(
-    get_package_share_directory('hbot_description'),
-    'urdf', 'hbot.urdf')
+    get_package_share_directory('hbot_bringup'),
+    'config', 'hbot.urdf')
   with open(urdf_path, 'r') as infp:
     robot_description = infp.read()
 
@@ -134,17 +134,6 @@ def generate_launch_description():
   hardware_nodes = GroupAction(
     condition=UnlessCondition(simulation_mode),
     actions = [
-      # Run driver to control the robot
-      IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(
-          get_package_share_directory('hbot_driver_' + controller_name),
-          'launch',
-          'hbot_driver.launch.py'
-        )),
-        launch_arguments={
-          'params_file': os.path.join(get_package_share_directory(package_name),
-          'config', 'yahboom_driver_params.yaml')}.items(),
-      ),
       # Run lidar node
       IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(
@@ -163,6 +152,7 @@ def generate_launch_description():
       )
     ]
   )
+
 
   # Simulation
   try:

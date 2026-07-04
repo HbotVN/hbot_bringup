@@ -11,7 +11,6 @@ Panels:
         - /TF1/Frames1
         - /TF1/Tree1
         - /RobotModel1
-        - /RobotModel1/Links1
       Splitter Ratio: 0.5
     Tree Height: 305
   - Class: rviz_common/Selection
@@ -123,14 +122,10 @@ Visualization Manager:
           Value: false
         laser:
           Value: false
-        left_wheel_link:
-          Value: false
         map:
           Value: true
         odom:
           Value: true
-        right_wheel_link:
-          Value: false
       Marker Scale: 1
       Name: TF
       Show Arrows: true
@@ -145,10 +140,6 @@ Visualization Manager:
                   {}
                 laser:
                   {}
-              left_wheel_link:
-                {}
-              right_wheel_link:
-                {}
       Update Interval: 0
       Value: true
     - Alpha: 0.8999999761581421
@@ -251,26 +242,21 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Class: rviz_default_plugins/Orbit
-      Distance: 4.62871789932251
+      Angle: 0
+      Class: rviz_default_plugins/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
-      Focal Point:
-        X: 0.4506349265575409
-        Y: -3.9043726921081543
-        Z: 0.0916612446308136
-      Focal Shape Fixed Size: true
-      Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.20979762077331543
+      Scale: 135.5234832763672
       Target Frame: <Fixed Frame>
-      Value: Orbit (rviz)
-      Yaw: 4.133569717407227
+      Value: TopDownOrtho (rviz_default_plugins)
+      X: -0.44664686918258667
+      Y: -0.9082544445991516
     Saved: ~
 Window Geometry:
   Displays:
@@ -290,5 +276,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1920
-  X: 1920
+  X: 0
   Y: 27
