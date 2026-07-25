@@ -124,6 +124,7 @@ def generate_launch_description():
     default_value='False',
     description='Whether to respawn if a node crashes. Applied when composition is disabled.'
   )
+
   urdf_path = os.path.join(
     get_package_share_directory('hbot_bringup'),
     'config', 'hbot.urdf')
