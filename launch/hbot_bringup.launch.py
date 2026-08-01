@@ -1,3 +1,4 @@
+from sys import executable
 import os
 from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, GroupAction,
@@ -79,7 +80,7 @@ def generate_launch_description():
 
   declare_enable_navigation_cmd = DeclareLaunchArgument(
     'enable_navigation',
-    default_value='True',
+    default_value='False',
     description='Whether to launch the Nav2 navigation stack'
   )
 
@@ -136,13 +137,24 @@ def generate_launch_description():
     condition=UnlessCondition(simulation_mode),
     actions = [
       # Run lidar node
+      # --- Lidar LDS-006 (bought fron shopee)
+#      IncludeLaunchDescription(
+#        PythonLaunchDescriptionSource(os.path.join(
+#          get_package_share_directory('lds_006_driver'),
+#          'launch',
+#          'lds_006_driver.launch.py'
+#        )),
+#      ),
+      # --- Lidar LDS01 from turtlebot 3
       IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(
-          get_package_share_directory('lds_006_driver'),
-          'launch',
-          'lds_006_driver.launch.py'
-        )),
+          get_package_share_directory('hls_lfcd_lds_driver'),
+            'launch',
+            'hlds_laser.launch.py'
+            )),
+          launch_arguments={'port': '/dev/usbttl'}.items(),
       ),
+
       # Robot description
       Node(
         package='robot_state_publisher',
@@ -179,30 +191,34 @@ def generate_launch_description():
     simulation_nodes = None
 
   # Run SLAM
+  # slam_cmd_group = GroupAction([
+  #   IncludeLaunchDescription(
+  #       PythonLaunchDescriptionSource(slam_launch_file),
+  #       launch_arguments={'use_sim_time': use_sim_time,
+  #                         'slam_params_file': slam_params_file}.items()),
+  # ], condition=IfCondition(slam))
+
+  # --- Cartographer
+  config_dir = os.path.join(get_package_share_directory('hbot_bringup'), 'config')
   slam_cmd_group = GroupAction([
     Node(
-      package='nav2_map_server',
-      executable='map_saver_server',
+      package = 'cartographer_ros',
+      executable = 'cartographer_node',
       output='screen',
-      respawn=use_respawn,
-      respawn_delay=2.0,
-      arguments=['--ros-args', '--log-level', log_level],
-      parameters=[configured_params]
+      parameters=[{'use_sim_time': use_sim_time}],
+      arguments=['-configuration_directory', config_dir,
+                 '-configuration_basename', 'carto_mapping.lua']
     ),
     Node(
-      package='nav2_lifecycle_manager',
-      executable='lifecycle_manager',
-      name='lifecycle_manager_slam',
+      package='cartographer_ros',
+      executable='cartographer_occupancy_grid_node',
+      name='cartographer_occupancy_grid_node',
       output='screen',
-      arguments=['--ros-args', '--log-level', log_level],
-      parameters=[{'use_sim_time': use_sim_time},
-                  {'autostart': autostart},
-                  {'node_names': lifecycle_nodes}]),
-    IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(slam_launch_file),
-        launch_arguments={'use_sim_time': use_sim_time,
-                          'slam_params_file': slam_params_file}.items()),
+      parameters=[{'use_sim_time': use_sim_time}],
+      arguments=['-resolution','0.05','-publish_period_sec','1.0']
+    )
   ], condition=IfCondition(slam))
+
 
   localization_cmd_group = GroupAction([
     IncludeLaunchDescription(

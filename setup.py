@@ -18,6 +18,7 @@ setup(
         ('share/' + package_name + '/config', ['config/ekf.yaml']),
         ('share/' + package_name + '/config', ['config/hbot.rviz']),
         ('share/' + package_name + '/config', ['config/hbot.urdf']),
+        ('share/' + package_name + '/config', ['config/carto_mapping.lua']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
