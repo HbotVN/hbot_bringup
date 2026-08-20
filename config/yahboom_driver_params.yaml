@@ -2,22 +2,23 @@ hbot_driver_yahboom_node:
   ros__parameters:
     port: /dev/myserial
     timeout: 0.1
-    debug: True
+    debug: false
     wheel_diameter: 0.065
-    wheel_base: 0.2
-    encoder_resolution: 11
+    wheel_track: 0.2
+    wheel_base: 0.15
     gear_ratio: 56
-    max_rpm: 205
-    max_rpm_before_gear: 12000
-    nominal_voltage: 12.0
-    odom_frequency : 20
-    odom_topic: odom_wheel
-    odom_frame: odom_wheel
-    publish_odom_tf: False
-    publish_imu: True
-    imu_freq: 200
+    encoder_resolution: 11
+    max_rpm: 100
+    cmd_vel_timeout: 0.5
+    motor_polarity: [1, 1, 1, -1]
+    encoder_polarity: [-1, 1, 1, 1]
+    odom_frequency: 20
+    odom_topic: odom
+    odom_frame: odom
     robot_base_frame: base_footprint
+    publish_odom_tf: true
+    publish_imu: true
+    imu_freq: 200
     systemstatus_frequency: 1
-    min_pwm: 0
-    pose_covariance_diagonal: [0.01, 0.01, 1.0e-9, 1.0e-9, 1.0e-9, 0.1]
-    twist_covariance_diagonal: [0.05, 0.05, 1.0e-9, 1.0e-9, 1.0e-9, 0.1]
+    pose_covariance_diagonal: [0.001, 0.001, 1.0e-9, 1.0e-9, 1.0e-9, 0.01]
+    twist_covariance_diagonal: [0.001, 0.001, 1.0e-9, 1.0e-9, 1.0e-9, 0.01]

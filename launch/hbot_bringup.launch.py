@@ -5,7 +5,7 @@ from launch.actions import (DeclareLaunchArgument, GroupAction,
                             IncludeLaunchDescription, SetEnvironmentVariable)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import Node, SetRemap
 from ament_index_python.packages import get_package_share_directory, PackageNotFoundError
 from launch.conditions import IfCondition, UnlessCondition
 from launch_ros.descriptions import ParameterFile
@@ -235,7 +235,17 @@ def generate_launch_description():
 
 
   # Run mapping, localization and navigation
+  # SetRemap renames velocity_smoother's output inside the vendored
+  # navigation_launch.py (from the navigation2 submodule) from 'cmd_vel' to
+  # 'cmd_vel_nav_smoothed', without editing that submodule directly - it
+  # overrides the node's own hardcoded ('cmd_vel_smoothed', 'cmd_vel') remap
+  # from outside since it's applied within the same GroupAction/launch
+  # context as the include. base_bringup.launch.py's twist_mux node then
+  # arbitrates this against the teleop smoother's output to produce the
+  # single, final 'cmd_vel' the driver consumes - previously both smoothers
+  # wrote directly to 'cmd_vel' with no arbitration between them.
   bringup_cmd_group = GroupAction([
+    SetRemap(src='cmd_vel_smoothed', dst='cmd_vel_nav_smoothed'),
     IncludeLaunchDescription(
       PythonLaunchDescriptionSource(os.path.join(
           get_package_share_directory('nav2_bringup'),

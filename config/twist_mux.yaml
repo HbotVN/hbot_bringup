@@ -1,0 +1,21 @@
+twist_mux:
+  ros__parameters:
+    # Arbitrates between teleop (web dashboard joystick) and Nav2 autonomous
+    # driving commands so only one source ever reaches the final 'cmd_vel'.
+    # Both sources are themselves rate/accel-limited nav2_velocity_smoother
+    # outputs - see base_bringup.launch.py (teleop_velocity_smoother) and
+    # hbot_bringup.launch.py (Nav2's velocity_smoother, remapped via
+    # SetRemap). Teleop has strictly higher priority: touching the joystick
+    # always overrides autonomous driving. timeout matches hbot_driver's own
+    # cmd_vel_timeout watchdog default (0.5s), so a source idle past that
+    # stops blocking the other - the driver's watchdog remains the final
+    # backstop if both go silent.
+    topics:
+      navigation:
+        topic: cmd_vel_nav_smoothed
+        timeout: 0.5
+        priority: 10
+      teleop:
+        topic: cmd_vel_teleop_smoothed
+        timeout: 0.5
+        priority: 100
