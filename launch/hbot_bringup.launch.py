@@ -21,6 +21,17 @@ def generate_launch_description():
   if controller_name not in ['yahboom']:
     raise RuntimeError('Unknown controller: ' + controller_name)
 
+  # LIDAR selection: 'lds01' (default) is the Turtlebot3-compatible LDS-01
+  # unit currently on the robot (driven by the apt-installed
+  # hls_lfcd_lds_driver package); 'ydlidar_x3' is the newly added YDLidar
+  # X3 Pro (driven by the ydlidar_ros2_driver package under src/lidars/,
+  # which needs the YDLidar SDK under src/YDLidar-SDK-master built and
+  # `sudo make install`-ed system-wide before it will colcon build).
+  lidar_model = os.environ.get('LIDAR_MODEL', 'lds01')
+
+  if lidar_model not in ['lds01', 'ydlidar_x3']:
+    raise RuntimeError('Unknown lidar model: ' + lidar_model)
+
   # Launch arguments
   simulation_mode = LaunchConfiguration('simulation_mode')
   run_rviz = LaunchConfiguration('run_rviz')
@@ -132,28 +143,55 @@ def generate_launch_description():
   with open(urdf_path, 'r') as infp:
     robot_description = infp.read()
 
+  # Lidar node, picked by the LIDAR_MODEL env var (see declaration above).
+  if lidar_model == 'ydlidar_x3':
+    # --- YDLidar X3 Pro
+    # x3_ydlidar_launch.py declares its own 'params_file' launch argument
+    # (defaulting to its own ydlidar_x3.yaml), but LaunchConfiguration names
+    # aren't per-include-scoped - they're shared across the whole launch
+    # tree unless reset by a scoped GroupAction (hardware_nodes below is
+    # one, so this override doesn't leak into the Nav2 groups that need
+    # their own 'params_file'). hbot_bringup.launch.py already declares a
+    # top-level 'params_file' argument for Nav2 (default nav2_params.yaml)
+    # earlier in this function, so by the time this include's own
+    # DeclareLaunchArgument runs, 'params_file' is already set -
+    # DeclareLaunchArgument never overwrites an existing value, so the
+    # ydlidar node would silently receive nav2_params.yaml (no
+    # ydlidar_ros2_driver_node: block in it) and fall back to the driver's
+    # hardcoded C++ default port ('/dev/ydlidar'), ignoring ydlidar_x3.yaml
+    # entirely. Passing params_file explicitly here forces the correct
+    # value before x3_ydlidar_launch.py's own declare runs.
+    lidar_node = IncludeLaunchDescription(
+      PythonLaunchDescriptionSource(os.path.join(
+        get_package_share_directory('ydlidar_ros2_driver'),
+        'launch',
+        'x3_ydlidar_launch.py'
+      )),
+      launch_arguments={
+        'params_file': os.path.join(
+          get_package_share_directory('ydlidar_ros2_driver'),
+          'params', 'ydlidar_x3.yaml')
+      }.items(),
+    )
+  else:
+    # --- Lidar LDS01 from turtlebot 3 (default)
+    # --- Lidar LDS-006 (bought from shopee) would be:
+    #   get_package_share_directory('lds_006_driver'), 'launch', 'lds_006_driver.launch.py'
+    lidar_node = IncludeLaunchDescription(
+      PythonLaunchDescriptionSource(os.path.join(
+        get_package_share_directory('hls_lfcd_lds_driver'),
+          'launch',
+          'hlds_laser.launch.py'
+          )),
+        launch_arguments={'port': '/dev/usbttl'}.items(),
+    )
+
   # Nodes
   hardware_nodes = GroupAction(
     condition=UnlessCondition(simulation_mode),
     actions = [
       # Run lidar node
-      # --- Lidar LDS-006 (bought fron shopee)
-#      IncludeLaunchDescription(
-#        PythonLaunchDescriptionSource(os.path.join(
-#          get_package_share_directory('lds_006_driver'),
-#          'launch',
-#          'lds_006_driver.launch.py'
-#        )),
-#      ),
-      # --- Lidar LDS01 from turtlebot 3
-      IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(
-          get_package_share_directory('hls_lfcd_lds_driver'),
-            'launch',
-            'hlds_laser.launch.py'
-            )),
-          launch_arguments={'port': '/dev/usbttl'}.items(),
-      ),
+      lidar_node,
 
       # Robot description
       Node(
