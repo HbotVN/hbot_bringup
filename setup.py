@@ -1,3 +1,5 @@
+from glob import glob
+
 from setuptools import find_packages, setup
 
 package_name = 'hbot_bringup'
@@ -20,6 +22,10 @@ setup(
         ('share/' + package_name + '/config', ['config/hbot.rviz']),
         ('share/' + package_name + '/config', ['config/hbot.urdf']),
         ('share/' + package_name + '/config', ['config/carto_mapping.lua']),
+        # Pre-built sample maps (used by slam:=False localization mode; the
+        # hbot_house_sim map is built from the Gazebo world - see
+        # scripts/dev_sim_build_map.sh).
+        ('share/' + package_name + '/maps', glob('maps/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
